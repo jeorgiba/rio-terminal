@@ -31,7 +31,7 @@ WORKDIR /app
 # Copy the entire project
 COPY . .
 
-# Build the WASM frontend
+# Build the WASM frontend directly
 WORKDIR /app/frontends/wasm
 RUN cargo build --target wasm32-unknown-unknown --release --lib
 
