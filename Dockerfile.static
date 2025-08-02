@@ -1,17 +1,18 @@
-# Multi-stage Docker build optimized for Render.com
+# Simplified Dockerfile for static site deployment
 # 
 # Credits: Based on Rio Terminal by Raphael Amorim
 # Original project: https://github.com/raphamorim/rio
 # Author: Raphael Amorim <rapha850@gmail.com>
 # License: MIT
-#
-FROM rust:1.88-slim as builder
+
+FROM rust:1.80-slim as builder
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     pkg-config \
     curl \
     build-essential \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Install WASM tools
@@ -21,31 +22,27 @@ RUN cargo install wasm-bindgen-cli
 # Set working directory
 WORKDIR /app
 
-# Copy dependency files first for better caching
-COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
-COPY */Cargo.toml ./
-
-# Copy source code
+# Copy the entire project
 COPY . .
 
-# Build Rio for WebAssembly
-RUN cargo build -p rioterm-wasm --target wasm32-unknown-unknown --release --lib
+# Build the WASM frontend
+WORKDIR /app/frontends/wasm
+RUN cargo build --target wasm32-unknown-unknown --release --lib
 
 # Generate JavaScript bindings
-WORKDIR /app/frontends/wasm
 RUN wasm-bindgen ../../target/wasm32-unknown-unknown/release/rioterm_wasm.wasm \
     --out-dir . \
     --target web \
     --no-typescript
 
-# Production stage with Nginx
+# Production stage - serve static files
 FROM nginx:alpine
 
-# Copy built WASM files
+# Copy built WASM files and HTML
 COPY --from=builder /app/frontends/wasm /usr/share/nginx/html
 
-# Copy nginx configuration
-COPY <<EOF /etc/nginx/nginx.conf
+# Create nginx configuration optimized for WASM and WebGPU
+RUN cat > /etc/nginx/nginx.conf << 'EOF'
 events {
     worker_connections 1024;
 }
@@ -55,34 +52,51 @@ http {
     default_type  application/octet-stream;
     
     # Add WASM MIME type
-    location ~* \.wasm$ {
-        add_header Content-Type application/wasm;
+    types {
+        application/wasm wasm;
     }
     
     server {
-        listen 10000;  # Render.com uses port 10000
-        server_name localhost;
+        listen 80;
+        server_name _;
         
-        # Required headers for WebGPU
+        # Required headers for WebGPU and SharedArrayBuffer
         add_header Cross-Origin-Embedder-Policy require-corp always;
         add_header Cross-Origin-Opener-Policy same-origin always;
         
+        # Security headers
+        add_header X-Frame-Options DENY always;
+        add_header X-Content-Type-Options nosniff always;
+        
         # Enable gzip compression
         gzip on;
+        gzip_vary on;
+        gzip_min_length 1000;
         gzip_types
             application/wasm
             application/javascript
             text/css
-            text/html;
+            text/html
+            text/plain
+            application/json;
+        
+        root /usr/share/nginx/html;
+        index index.html;
         
         location / {
-            root   /usr/share/nginx/html;
-            index  index.html;
             try_files $uri $uri/ /index.html;
         }
         
-        # Cache WASM files
-        location ~* \.(wasm|js)$ {
+        # Cache WASM files aggressively
+        location ~* \.(wasm)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+            add_header Cross-Origin-Embedder-Policy require-corp always;
+            add_header Cross-Origin-Opener-Policy same-origin always;
+        }
+        
+        # Cache JS files
+        location ~* \.(js)$ {
             expires 1y;
             add_header Cache-Control "public, immutable";
         }
@@ -90,8 +104,6 @@ http {
 }
 EOF
 
-# Expose port 10000 (Render.com requirement)
-EXPOSE 10000
+EXPOSE 80
 
-# Start Nginx
 CMD ["nginx", "-g", "daemon off;"]

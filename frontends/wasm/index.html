@@ -3,17 +3,43 @@
   <head>
     <meta charset="utf-8" />
     <title>Rio Terminal WebAssembly</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 20px;
+        font-family: system-ui, -apple-system, sans-serif;
+        background: #1a1a1a;
+        color: #ffffff;
+      }
+      #loading {
+        text-align: center;
+        padding: 50px;
+      }
+      canvas {
+        display: block;
+        margin: 0 auto;
+        border: 1px solid #333;
+      }
+    </style>
   </head>
   <body>
+    <div id="loading">
+      <h1>🦀 Rio Terminal</h1>
+      <p>Loading WebAssembly terminal...</p>
+    </div>
     <script type="module">
-      import init from "./wasm/rioterm.js";
-      init()
-        .then(() => {
-          console.log("Rio terminal was loaded");
-        })
-        .catch(err => {
-          console.log(err);
-        });
+      import init from "./rioterm_wasm.js";
+      
+      const loading = document.getElementById('loading');
+      
+      try {
+        await init();
+        loading.innerHTML = '<h1>✅ Rio Terminal Loaded</h1><p>WebGPU-accelerated terminal ready!</p>';
+        console.log("Rio terminal WebAssembly module loaded successfully");
+      } catch (err) {
+        loading.innerHTML = '<h1>❌ Loading Failed</h1><p>Error: ' + err.message + '</p>';
+        console.error("Failed to load Rio terminal:", err);
+      }
     </script>
   </body>
 </html>
