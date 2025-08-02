@@ -1,0 +1,56 @@
+# Render.com deployment configuration for Rio Terminal
+#
+# Credits: Based on Rio Terminal by Raphael Amorim
+# Original project: https://github.com/raphamorim/rio
+# Author: Raphael Amorim <rapha850@gmail.com>
+# License: MIT
+#
+services:
+  - type: web
+    name: rio-terminal-wasm
+    env: static
+    repo: https://github.com/jeorgiba/rio-terminal.git
+    branch: main
+    buildCommand: |
+      # Install Rust and WASM tools
+      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+      source ~/.cargo/env
+      rustup target add wasm32-unknown-unknown
+      cargo install wasm-bindgen-cli
+      
+      # Build Rio for WASM
+      cargo build -p rioterm --target wasm32-unknown-unknown --release --lib
+      
+      # Generate JavaScript bindings
+      cd frontends/wasm
+      wasm-bindgen ../target/wasm32-unknown-unknown/release/rioterm.wasm --out-dir wasm --target web --no-typescript
+      
+      # Optional: Optimize WASM (if wasm-opt is available)
+      # wasm-opt -O wasm/rioterm_bg.wasm -o wasm/rioterm_bg.wasm
+    
+    staticPublishPath: ./frontends/wasm
+    
+    # Required headers for WebGPU and SharedArrayBuffer
+    headers:
+      - path: /*
+        name: Cross-Origin-Embedder-Policy
+        value: require-corp
+      - path: /*
+        name: Cross-Origin-Opener-Policy
+        value: same-origin
+      - path: /wasm/*
+        name: Content-Type
+        value: application/wasm
+    
+    # Route configuration
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    
+    # Environment variables (optional)
+    envVars:
+      - key: RUST_VERSION
+        value: "1.88"
+      - key: CARGO_TARGET_DIR
+        value: "target"
