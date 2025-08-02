@@ -7,13 +7,21 @@
 #
 services:
   - type: web
-    name: rio-terminal-wasm
-    env: docker
+    name: rio-terminal-docker
+    runtime: docker
     repo: https://github.com/jeorgiba/rio-terminal.git
     branch: main
     dockerfilePath: ./Dockerfile.static
+    region: oregon
+    plan: free
     
-    # Required headers for WebGPU and SharedArrayBuffer
+    # Configure port
+    port: 80
+    
+    # Health check
+    healthCheckPath: /
+    
+    # Required headers for WebGPU and SharedArrayBuffer  
     headers:
       - path: /*
         name: Cross-Origin-Embedder-Policy
@@ -24,3 +32,6 @@ services:
       - path: /*.wasm
         name: Content-Type
         value: application/wasm
+      - path: /*.js
+        name: Content-Type
+        value: application/javascript
