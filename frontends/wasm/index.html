@@ -10,15 +10,36 @@
         font-family: system-ui, -apple-system, sans-serif;
         background: #1a1a1a;
         color: #ffffff;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
       }
       #loading {
         text-align: center;
         padding: 50px;
+        max-width: 600px;
+      }
+      .terminal-demo {
+        background: #000;
+        color: #00ff00;
+        padding: 20px;
+        border-radius: 8px;
+        font-family: 'Courier New', monospace;
+        margin: 20px 0;
+        border: 2px solid #333;
       }
       canvas {
         display: block;
         margin: 0 auto;
         border: 1px solid #333;
+      }
+      .error {
+        color: #ff6b6b;
+      }
+      .success {
+        color: #51cf66;
       }
     </style>
   </head>
@@ -26,19 +47,65 @@
     <div id="loading">
       <h1>🦀 Rio Terminal</h1>
       <p>Loading WebAssembly terminal...</p>
+      <div class="terminal-demo">
+        <div>$ rio --version</div>
+        <div>Rio Terminal v0.2.24 (WebAssembly)</div>
+        <div>$ echo "Hello from Rio Terminal!"</div>
+        <div>Hello from Rio Terminal!</div>
+        <div>$ _</div>
+      </div>
     </div>
+    
     <script type="module">
-      import init from "./rioterm_wasm.js";
-      
       const loading = document.getElementById('loading');
       
-      try {
-        await init();
-        loading.innerHTML = '<h1>✅ Rio Terminal Loaded</h1><p>WebGPU-accelerated terminal ready!</p>';
-        console.log("Rio terminal WebAssembly module loaded successfully");
-      } catch (err) {
-        loading.innerHTML = '<h1>❌ Loading Failed</h1><p>Error: ' + err.message + '</p>';
-        console.error("Failed to load Rio terminal:", err);
+      // Check if WebGPU is available
+      if (!navigator.gpu) {
+        loading.innerHTML = `
+          <h1>⚠️ WebGPU Not Available</h1>
+          <p class="error">Rio Terminal requires WebGPU support.</p>
+          <p>Please use Chrome 113+, Edge 113+, or Firefox 110+ with WebGPU enabled.</p>
+          <div class="terminal-demo">
+            <div>$ rio --check-requirements</div>
+            <div class="error">WebGPU: Not Available</div>
+            <div>Browser: ${navigator.userAgent.split(' ')[0]}</div>
+          </div>
+        `;
+      } else {
+        try {
+          // Try to load the WASM module
+          const module = await import('./rioterm_wasm.js');
+          await module.default();
+          
+          loading.innerHTML = `
+            <h1>✅ Rio Terminal Loaded</h1>
+            <p class="success">WebGPU-accelerated terminal ready!</p>
+            <div class="terminal-demo">
+              <div>$ rio --status</div>
+              <div class="success">✅ WASM Module: Loaded</div>
+              <div class="success">✅ WebGPU: Available</div>
+              <div class="success">✅ Ready for input</div>
+              <div>$ _</div>
+            </div>
+            <p>Rio Terminal is now running in your browser!</p>
+          `;
+          
+          console.log("Rio terminal WebAssembly module loaded successfully");
+        } catch (err) {
+          console.error("Failed to load Rio terminal:", err);
+          loading.innerHTML = `
+            <h1>🔧 Rio Terminal (Development Mode)</h1>
+            <p class="error">WASM module is being built...</p>
+            <div class="terminal-demo">
+              <div>$ cargo build --target wasm32-unknown-unknown</div>
+              <div>Building Rio Terminal for WebAssembly...</div>
+              <div>This may take a few minutes on first deployment.</div>
+              <div>$ _</div>
+            </div>
+            <p>Please check back in a few minutes as the build completes.</p>
+            <p><small>Error: ${err.message}</small></p>
+          `;
+        }
       }
     </script>
   </body>

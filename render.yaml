@@ -11,5 +11,5 @@ services:
     env: docker
     repo: https://github.com/jeorgiba/rio-terminal.git
     branch: main
-    dockerfilePath: ./Dockerfile.static
+    dockerfilePath: ./Dockerfile.simple
     plan: free
