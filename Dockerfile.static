@@ -41,68 +41,8 @@ FROM nginx:alpine
 # Copy built WASM files and HTML
 COPY --from=builder /app/frontends/wasm /usr/share/nginx/html
 
-# Create nginx configuration optimized for WASM and WebGPU
-RUN cat > /etc/nginx/nginx.conf << 'EOF'
-events {
-    worker_connections 1024;
-}
-
-http {
-    include       /etc/nginx/mime.types;
-    default_type  application/octet-stream;
-    
-    # Add WASM MIME type
-    types {
-        application/wasm wasm;
-    }
-    
-    server {
-        listen 80;
-        server_name _;
-        
-        # Required headers for WebGPU and SharedArrayBuffer
-        add_header Cross-Origin-Embedder-Policy require-corp always;
-        add_header Cross-Origin-Opener-Policy same-origin always;
-        
-        # Security headers
-        add_header X-Frame-Options DENY always;
-        add_header X-Content-Type-Options nosniff always;
-        
-        # Enable gzip compression
-        gzip on;
-        gzip_vary on;
-        gzip_min_length 1000;
-        gzip_types
-            application/wasm
-            application/javascript
-            text/css
-            text/html
-            text/plain
-            application/json;
-        
-        root /usr/share/nginx/html;
-        index index.html;
-        
-        location / {
-            try_files $uri $uri/ /index.html;
-        }
-        
-        # Cache WASM files aggressively
-        location ~* \.(wasm)$ {
-            expires 1y;
-            add_header Cache-Control "public, immutable";
-            add_header Cross-Origin-Embedder-Policy require-corp always;
-            add_header Cross-Origin-Opener-Policy same-origin always;
-        }
-        
-        # Cache JS files
-        location ~* \.(js)$ {
-            expires 1y;
-            add_header Cache-Control "public, immutable";
-        }
-    }
-}
-EOF
+# Copy nginx configuration
+COPY nginx.conf /etc/nginx/nginx.conf
 
 EXPOSE 80
 
